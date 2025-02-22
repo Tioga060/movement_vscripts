@@ -35,25 +35,17 @@ function toQAngle(vector) {
 	return QAngle(vector.x, vector.y, vector.z);
 }
 
-// Normalizes the given vector
-function normalize(v)
-{
-	v = toVector(v);
-	local len = v.Length();
-	return Vector(v.x/len,v.y/len,v.z/len);
-}
-
 function qAngleToNormalizedVectorXY(qAngle) {
 	return rotateVectorAroundZ(Vector(1, 0, 0), qAngle.y);
 }
 
-function eyeAngleToNormalizedVector(eyeAngles) {
-	local yaw = toRadians(eyeAngles.y);
-	local pitch = toRadians(eyeAngles.x);
+function qAngleToVector(qAngle) {
+	local yaw = toRadians(qAngle.y);
+	local pitch = toRadians(qAngle.x);
 	local x = cos(yaw)*cos(pitch);
 	local y = sin(yaw)*cos(pitch);
 	local z = -sin(pitch);
-	return normalize(Vector(x, y, z));
+	return Vector(x, y, z);
 }
 
 local PI = 3.14159;
@@ -72,22 +64,11 @@ function rotateVectorAroundZ(v, degrees) {
 	return Vector(x, y, v.z);
 }
 
-function getXYSpeed(ent) {
-	local velocity = ent.GetAbsVelocity();
-	return sqrt(pow(velocity.x, 2) + pow(velocity.y, 2));
-}
-
-function getAbsoluteSpeed(ent) {
-	local velocity = ent.GetAbsVelocity();
-	return sqrt(pow(velocity.x, 2) + pow(velocity.y, 2) + pow(velocity.z, 2));
-}
-
 // --------------Movement Functions-------------- //
 
 // Reverses a player's velocity on the given axis
 function BouncePlayer(axis) {
   local startVelocity = activator.GetAbsVelocity();
-  activator.SetVelocity(Vector(0,0,0));
   switch(axis){
 		case 0:
       // X
@@ -119,7 +100,7 @@ function FinishSkating() {
 // Teleports a player to the given entityName
 // set snapToDestinationAngles to 1 to snap the player's velocity and eye angles to the destination
 // set useCallerOffset to 1 to translate the player's destination relative to the input's origin (like a traditional landmark teleport)
-// Trigger must have its name set to the angle the player will be entering from
+// Trigger must have its name set to yaw the angle the player will be entering from
 function LandmarkTeleportXY(entityName, snapToDestinationAngles, useCallerOffset) {
 	// Only supports rotations around the Z axis
 	local destination = Entities.FindByName(null, entityName);
@@ -131,7 +112,7 @@ function LandmarkTeleportXY(entityName, snapToDestinationAngles, useCallerOffset
 	local callerAngle = caller.GetName().tointeger();
 
 	local positionDelta = Vector(0,0,0);
-	if (useCallerOffset == 1) {
+	if (useCallerOffset) {
 		local angleDelta = destination.GetAbsAngles().y - callerAngle;
 		positionDelta = activator.GetOrigin() - caller.GetOrigin();
 		
@@ -139,10 +120,10 @@ function LandmarkTeleportXY(entityName, snapToDestinationAngles, useCallerOffset
 	}
 
 	activator.SetAbsOrigin(destination.GetOrigin() + positionDelta);
-	local activatorSpeed = getXYSpeed(activator);
+	local activatorSpeed = activator.GetAbsVelocity().Length2D();
 	local activatorVelocity = activator.GetAbsVelocity();
 
-	if (snapToDestinationAngles == 1) {
+	if (snapToDestinationAngles) {
 		local destinationAngle = destination.GetAbsAngles();
 		activator.SnapEyeAngles(destinationAngle);
 		local xyVelocity = qAngleToNormalizedVectorXY(destinationAngle) * activatorSpeed;
@@ -159,6 +140,8 @@ function LandmarkTeleportXY(entityName, snapToDestinationAngles, useCallerOffset
 
 // Redirects all of a player's velocity to the direction they are looking
 function RedirectVelocityToEyeAngles() {
-	local speed = getAbsoluteSpeed(activator);
-	activator.SetVelocity(eyeAngleToNormalizedVector(activator.EyeAngles()) * speed);
+	local speed = activator.GetAbsVelocity().Length();
+	local eyeVector = qAngleToVector(activator.EyeAngles());
+	eyeVector.Norm();
+	activator.SetVelocity(eyeVector * speed);
 }
